@@ -1,5 +1,9 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
+use tokio::fs::{read_dir, File};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::runtime::Runtime;
+use tokio::task::spawn;
 
 /// A basic example
 #[derive(StructOpt, Debug)]
@@ -18,29 +22,52 @@ struct Opt {
     verbose: u8,
 
     /// Set speed
-    #[structopt(short, long, default_value = "42")]
+    #[structopt(short, long, default_value = "1000")]
     speed: f64,
+
+    /// Input file
+    #[structopt(short, long, parse(from_os_str))]
+    input: PathBuf,
 
     /// Output file
     #[structopt(short, long, parse(from_os_str))]
     output: PathBuf,
 
-    // the long option will be translated by default to kebab case,
-    // i.e. `--nb-cars`.
-    /// Number of cars
-    #[structopt(short = "c", long)]
-    nb_cars: Option<i32>,
-
     /// admin_level to consider
     #[structopt(short, long)]
     level: Vec<String>,
-
-    /// Files to process
-    #[structopt(name = "FILE", parse(from_os_str))]
-    files: Vec<PathBuf>,
 }
 
 fn main() {
-    let opt = Opt::from_args();
+    let opt: Opt = Opt::from_args();
+
     println!("{:#?}", opt);
+
+    let tr = Runtime::new().unwrap();
+    tr.block_on(async {
+        let mut entries = read_dir(opt.input).await.unwrap();
+
+        while let Some(entry) = entries.next_entry().await.unwrap_or_else(|e| {
+            println!("{}", e);
+            None
+        }) {
+            let file_name = entry.file_name();
+
+            spawn(async move {
+                let f = File::open(file_name).await.unwrap();
+
+                // Packing a layer of `BufReader` on top of `File` can satisfy AsyncBufRead -> AsyncBufReadExt.
+                // then can call `lines`.
+                let buf_reader = BufReader::new(f);
+                let mut lines = buf_reader.lines();
+
+                while let Some(line) = lines.next_line().await.unwrap_or_else(|e| {
+                    println!("{}", e);
+                    None
+                }) {
+                    println!("length = {}", line.len())
+                }
+            });
+        }
+    });
 }
