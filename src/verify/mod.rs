@@ -99,13 +99,13 @@ pub(crate) async fn verify_one_conf(
         if state == 2 {
             match proto {
                 Proto::Udp => {
-                    if verify_addres_by_udp(address).await {
+                    if verify_addres_by_udp(address).await.is_ok() {
                         through_file_name = Some(file_name);
                     }
                 }
 
                 Proto::Tcp => {
-                    if verify_addres_by_tcp(address).await {
+                    if verify_addres_by_tcp(address).await.is_ok() {
                         through_file_name = Some(file_name);
                     }
                 }

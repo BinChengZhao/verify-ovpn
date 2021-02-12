@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 structopt = "0.3.21"
 tokio = {version="1.2.0", features=["full"]}
+progress_bar = "0.1.3"
